@@ -1,0 +1,26 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+env/
+
+# Environment variables
+.env
+
+# Uploaded content
+static/*.jpg
+static/*.jpeg
+static/*.png
+static/*.gif
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Database credentials
+config.py
