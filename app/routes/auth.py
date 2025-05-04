@@ -1,6 +1,7 @@
 import hashlib
 from flask import Blueprint, render_template, request, session, url_for, redirect, flash
 from app.utils.db import get_db_connection
+from flask import current_app
 
 bp = Blueprint('auth', __name__)
 
