@@ -5,6 +5,7 @@ import uuid
 import hashlib
 import time
 from functools import wraps
+from supabase import create_client, Client
 
 app = Flask(__name__)
 app.secret_key = "super secret key"
@@ -12,14 +13,24 @@ IMAGES_DIR = os.path.join(os.getcwd(), "static")
 SALT = '12345'
 
 
-conn = pymysql.connect(host='localhost',
-                       port = 3306,
-                       user='root',
-                       password='',
-                       db='finstagram',
-                       charset='utf8mb4',
-                       cursorclass=pymysql.cursors.DictCursor,
-                       autocommit =True)
+# conn = pymysql.connect(host='localhost',
+#                        port = 3306,
+#                        user='root',
+#                        password='',
+#                        db='finstagram',
+#                        charset='utf8mb4',
+#                        cursorclass=pymysql.cursors.DictCursor,
+#                        autocommit =True)
+
+# Initialize Supabase client
+supabase_url = os.getenv("SUPABASE_URL")
+supabase_key = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(supabase_url, supabase_key)
+
+def get_current_user():
+    if 'username' in session:
+        return session['username']
+    return None
 
 def login_required(f):
     @wraps(f)
