@@ -1,59 +1,103 @@
-from app.utils.db import get_db_connection
-import hashlib
-from flask import current_app
+from app.utils.supabase import supabase
 
 class User:
     @staticmethod
     def get_by_username(username):
         """Get user by username"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT * FROM person WHERE username = %s'
-        cursor.execute(query, (username,))
-        user = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return user
+        response = supabase.table("profiles") \
+            .select("*") \
+            .eq("username", username) \
+            .single() \
+            .execute()
+        
+        return response.data
+    
+    @staticmethod
+    def get_by_id(user_id):
+        """Get user by ID"""
+        response = supabase.table("profiles") \
+            .select("*") \
+            .eq("id", user_id) \
+            .single() \
+            .execute()
+        
+        return response.data
     
     @staticmethod
     def authenticate(username, password):
         """Authenticate a user"""
-        password = password + current_app.config['SALT']
-        hashed_password = hashlib.sha256(password.encode("utf-8")).hexdigest()
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT * FROM person WHERE username = %s and password = %s'
-        cursor.execute(query, (username, hashed_password))
-        user = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        
-        return user
+        try:
+            # Sign in with email and password (converted from username)
+            response = supabase.auth.sign_in_with_password({
+                "email": f"{username}@example.com",  # Convert username to email format
+                "password": password
+            })
+            
+            # Get user profile
+            user_id = response.user.id
+            profile = User.get_by_id(user_id)
+            
+            return {
+                "success": True,
+                "user_id": user_id,
+                "username": profile.get('username'),
+                "firstName": profile.get('firstName'),
+                "lastName": profile.get('lastName')
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": "Invalid username or password"
+            }
     
     @staticmethod
     def create(username, password, firstname, lastname, biography):
         """Create a new user"""
-        password = password + current_app.config['SALT']
-        hashed_password = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        try:
+            # Check if username already exists
+            existing = supabase.table("profiles") \
+                .select("*") \
+                .eq("username", username) \
+                .execute()
+            
+            if existing.data:
+                return {"success": False, "message": "This user already exists"}
+            
+            # Create a new user
+            auth_response = supabase.auth.sign_up({
+                "email": f"{username}@example.com",  # Convert username to email format
+                "password": password,
+                "options": {
+                    "data": {
+                        "username": username,
+                        "first_name": firstname,
+                        "last_name": lastname
+                    }
+                }
+            })
+            
+            # Create profile entry
+            profile_data = {
+                "id": auth_response.user.id,
+                "username": username,
+                "firstName": firstname, 
+                "lastName": lastname,
+                "biography": biography
+            }
+            
+            supabase.table("profiles").insert(profile_data).execute()
+            
+            return {"success": True, "message": "User created successfully"}
+        except Exception as e:
+            return {"success": False, "message": f"Registration failed: {str(e)}"}
+    
+    @staticmethod
+    def get_all_users(except_user_id=None):
+        """Get all users, optionally excluding one user"""
+        query = supabase.table("profiles").select("username, firstName, lastName")
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Check if user already exists
-        query = 'SELECT * FROM person WHERE username = %s'
-        cursor.execute(query, (username,))
-        existing_user = cursor.fetchone()
-        
-        if existing_user:
-            cursor.close()
-            conn.close()
-            return False, "This user already exists"
-        
-        # Create the user
-        ins = 'INSERT INTO person VALUES(%s, %s, %s, %s, %s)'
-        cursor.execute(ins, (username, hashed_password, firstname, lastname, biography))
-        cursor.close()
-        conn.close()
-        
-        return True, "User created successfully"
+        if except_user_id:
+            query = query.neq("id", except_user_id)
+            
+        response = query.execute()
+        return response.data

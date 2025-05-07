@@ -1,94 +1,92 @@
-from app.utils.db import get_db_connection
-import time
+from app.utils.supabase import supabase
 
 class Photo:
     @staticmethod
-    def get_user_photos(username):
+    def get_user_photos(user_id):
         """Get photos posted by a user"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = '''SELECT ID, firstName, lastName, photoOwner, postingDate, caption, filePath
-                  FROM photo JOIN person ON (photoOwner = username)
-                  WHERE photoOwner = %s
-                  ORDER BY postingDate DESC'''
-        cursor.execute(query, (username,))
-        photos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return photos
+        response = supabase.table("photos") \
+            .select("*, profiles(firstName, lastName)") \
+            .eq("photoOwner", user_id) \
+            .order("postingDate", desc=True) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def get_feed_photos(username):
-        """Get photos from people the user follows and shared with groups"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = '''SELECT ID, photoOwner, postingDate, caption, filePath, firstName, lastName
-                  FROM photo JOIN follow ON (photoOwner = followingUsername) 
-                  JOIN person ON (followingUsername = username)
-                  WHERE followerUsername = %s AND allFollowers = 1 AND followStatus = 1
-                  UNION
-                  SELECT p.ID, p.photoOwner, p.postingDate, p.caption, p.filePath, r.firstName, r.lastName
-                  FROM belongto AS b JOIN sharewith AS s ON (s.groupName = b.groupName AND s.groupOwner = b.groupOwner)
-                  JOIN photo AS p ON (p.ID = s.ID) JOIN person AS r ON (p.photoOwner = r.username)
-                  WHERE b.username = %s AND b.username != p.photoOwner
-                  ORDER BY postingDate DESC'''
-        cursor.execute(query, (username, username))
-        photos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return photos
+    def get_photo_by_id(photo_id):
+        """Get a specific photo by ID"""
+        response = supabase.table("photos") \
+            .select("*, profiles(firstName, lastName)") \
+            .eq("id", photo_id) \
+            .single() \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def create(username, caption, filepath, all_followers, group_name=None):
-        """Create a new photo post"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
+    def get_feed_photos(user_id):
+        """Get photos for user's feed (from followed users and shared group posts)"""
+        response = supabase.rpc('get_feed_posts', {
+            'user_uuid': user_id
+        }).execute()
         
-        # Insert photo
-        query = 'INSERT INTO photo (photoOwner, postingDate, filePath, allFollowers, caption) VALUES (%s, %s, %s, %s, %s)'
-        cursor.execute(query, (username, time.strftime('%Y-%m-%d %H:%M:%S'), filepath, all_followers, caption))
+        return response.data
+    
+    @staticmethod
+    def upload_photo(user_id, file, all_followers, caption, group_name=None):
+        """Upload a new photo"""
+        image_name = file.filename
+        file_path = f"{user_id}/{image_name}"
         
-        result = {"success": True, "message": "Photo uploaded successfully"}
+        # Upload file to Supabase Storage
+        supabase.storage.from_("photos").upload(
+            file_path,
+            file.read()
+        )
         
-        # If shared with a group
+        # Add image record to database
+        photo_data = {
+            "photoOwner": user_id,
+            "filePath": file_path,
+            "allFollowers": all_followers == '1',
+            "caption": caption
+        }
+        
+        response = supabase.table("photos").insert(photo_data).execute()
+        
+        # If not visible to all followers, share with a specific group
         if all_followers == '0' and group_name:
+            photo_id = response.data[0]['id']
+            
             # Get group owner
-            query = 'SELECT groupOwner FROM friendgroups WHERE groupName = %s'
-            cursor.execute(query, (group_name,))
-            group_data = cursor.fetchone()
-            
-            if not group_data:
-                result["success"] = False
-                result["message"] = "Group not found"
-                cursor.close()
-                conn.close()
-                return result
+            group_response = supabase.table("friendgroups") \
+                .select("groupOwner") \
+                .eq("groupName", group_name) \
+                .execute()
                 
-            group_owner = group_data['groupOwner']
-            
-            # Check if user is in group
-            query = 'SELECT * FROM belongto WHERE groupName = %s AND username = %s'
-            cursor.execute(query, (group_name, username))
-            in_group = cursor.fetchone()
-            
-            if not in_group:
-                result["success"] = False
-                result["message"] = "You are not in that friend group"
-                cursor.close()
-                conn.close()
-                return result
-            
-            # Get latest photo ID
-            query = '''SELECT ID FROM photo WHERE photoOwner = %s
-                      ORDER BY postingDate DESC LIMIT 1'''
-            cursor.execute(query, (username,))
-            photo = cursor.fetchone()
-            photo_id = photo['ID']
-            
-            # Share with group
-            query = 'INSERT INTO sharewith (ID, groupName, groupOwner) VALUES(%s, %s, %s)'
-            cursor.execute(query, (photo_id, group_name, group_owner))
+            if group_response.data:
+                groupOwner = group_response.data[0]['groupOwner']
+                
+                # Check if user belongs to the group
+                belong_response = supabase.table("belongto") \
+                    .select("*") \
+                    .eq("groupName", group_name) \
+                    .eq("username", user_id) \
+                    .execute()
+                    
+                if belong_response.data:
+                    # Share with group
+                    share_data = {
+                        "ID": photo_id,
+                        "groupName": group_name,
+                        "groupOwner": groupOwner
+                    }
+                    
+                    supabase.table("sharewith").insert(share_data).execute()
+                    return {"success": True, "message": "Photo uploaded and shared with group"}
+                else:
+                    return {"success": False, "message": "You are not in that friend group"}
+            else:
+                return {"success": False, "message": "Group not found"}
         
-        cursor.close()
-        conn.close()
-        return result
+        return {"success": True, "message": "Photo uploaded successfully"}

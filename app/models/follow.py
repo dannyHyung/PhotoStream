@@ -1,94 +1,115 @@
-from app.utils.db import get_db_connection
+from app.utils.supabase import supabase
 
 class Follow:
     @staticmethod
-    def get_following(username):
-        """Get list of users that username is following"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT followingUsername FROM follow WHERE followerUsername = %s AND followStatus = 1'
-        cursor.execute(query, (username,))
-        following = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return following
+    def get_following(user_id):
+        """Get list of users that user_id is following (with status = 1)"""
+        response = supabase.table("follows") \
+            .select("profiles!follows_followingUsername_fkey(username).username as followingUsername") \
+            .eq("followerUsername", user_id) \
+            .eq("followStatus", True) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def get_followers(username):
-        """Get list of users following username"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT followerUsername FROM follow WHERE followingUsername = %s AND followStatus = 1'
-        cursor.execute(query, (username,))
-        followers = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return followers
+    def get_followers(user_id):
+        """Get list of users following user_id (with status = 1)"""
+        response = supabase.table("follows") \
+            .select("profiles!follows_followerUsername_fkey(username).username as followerUsername") \
+            .eq("followingUsername", user_id) \
+            .eq("followStatus", True) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def get_pending_requests(username):
-        """Get pending follow requests sent by username"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT followingUsername FROM follow WHERE followerUsername = %s AND followStatus = 0'
-        cursor.execute(query, (username,))
-        pending = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return pending
+    def get_pending_requests(user_id):
+        """Get pending follow requests sent by user_id"""
+        response = supabase.table("follows") \
+            .select("profiles!follows_followingUsername_fkey(username).username as followingUsername") \
+            .eq("followerUsername", user_id) \
+            .eq("followStatus", False) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def get_pending_followers(username):
-        """Get pending follow requests to username"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT * FROM follow WHERE followingUsername = %s AND followStatus = 0'
-        cursor.execute(query, (username,))
-        pending = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return pending
+    def get_pending_followers(user_id):
+        """Get pending follow requests to user_id"""
+        response = supabase.table("follows") \
+            .select("*, profiles!follows_followerUsername_fkey(username)") \
+            .eq("followingUsername", user_id) \
+            .eq("followStatus", False) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def request_follow(follower, following):
+    def request_follow(follower_id, following_username):
         """Create a follow request"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # First get the user ID for the username to follow
+        user_response = supabase.table("profiles") \
+            .select("id") \
+            .eq("username", following_username) \
+            .single() \
+            .execute()
         
-        # Check if already following
-        query = 'SELECT * FROM follow WHERE followerUsername = %s AND followingUsername = %s'
-        cursor.execute(query, (follower, following))
-        existing = cursor.fetchone()
+        if not user_response.data:
+            return {"success": False, "message": "User not found"}
         
-        if existing:
-            if existing['followStatus'] == 1:
-                result = {"success": False, "message": "Already following this user"}
+        following_id = user_response.data['id']
+        
+        # Check if already following or pending
+        existing_follow = supabase.table("follows") \
+            .select("*") \
+            .eq("followerUsername", follower_id) \
+            .eq("followingUsername", following_id) \
+            .execute()
+        
+        if existing_follow.data:
+            if any(follow['followStatus'] for follow in existing_follow.data):
+                return {"success": False, "message": "Already following this user"}
             else:
-                result = {"success": False, "message": "Request already pending"}
-        else:
-            query = 'INSERT INTO follow VALUES (%s, %s, 0)'
-            cursor.execute(query, (follower, following))
-            result = {"success": True, "message": "Follow request sent"}
+                return {"success": False, "message": "Request already pending"}
         
-        cursor.close()
-        conn.close()
-        return result
+        # Create follow request
+        supabase.table("follows").insert({
+            "followerUsername": follower_id,
+            "followingUsername": following_id,
+            "followStatus": False
+        }).execute()
+        
+        return {"success": True, "message": "Follow request sent"}
     
     @staticmethod
-    def manage_request(follower, following, accept):
+    def manage_request(follower_username, user_id, accept):
         """Accept or reject a follow request"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # Get follower's profile ID from username
+        follower_profile = supabase.table("profiles") \
+            .select("id") \
+            .eq("username", follower_username) \
+            .single() \
+            .execute()
+        
+        if not follower_profile.data:
+            return {"success": False, "message": "User not found"}
+        
+        follower_id = follower_profile.data['id']
         
         if accept:
-            query = 'UPDATE follow SET followStatus = 1 WHERE followerUsername = %s AND followingUsername = %s'
-            cursor.execute(query, (follower, following))
-            result = {"success": True, "message": "Follow request accepted"}
+            # Accept the follow request
+            supabase.table("follows") \
+                .update({"followStatus": True}) \
+                .eq("followerUsername", follower_id) \
+                .eq("followingUsername", user_id) \
+                .execute()
+            return {"success": True, "message": "Follow request accepted"}
         else:
-            query = 'DELETE FROM follow WHERE followerUsername = %s AND followingUsername = %s'
-            cursor.execute(query, (follower, following))
-            result = {"success": True, "message": "Follow request rejected"}
-        
-        cursor.close()
-        conn.close()
-        return result
+            # Decline the follow request
+            supabase.table("follows") \
+                .delete() \
+                .eq("followerUsername", follower_id) \
+                .eq("followingUsername", user_id) \
+                .execute()
+            return {"success": True, "message": "Follow request rejected"}

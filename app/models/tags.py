@@ -1,100 +1,99 @@
-from app.utils.db import get_db_connection
+from app.utils.supabase import supabase
 
 class Tag:
     @staticmethod
     def get_photo_tags(photo_id):
         """Get tags for a photo"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT username FROM tagged WHERE ID = %s AND tagStatus = 1'
-        cursor.execute(query, (photo_id,))
-        tags = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return tags
+        response = supabase.table("tagged") \
+            .select("*, profiles(username)") \
+            .eq("ID", photo_id) \
+            .eq("tagStatus", True) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def get_pending_tags(username):
+    def get_pending_tags(user_id):
         """Get pending tag requests for a user"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = '''SELECT t.*, p.photoOwner, p.filePath, p.caption 
-                  FROM tagged t JOIN photo p ON t.ID = p.ID 
-                  WHERE t.username = %s AND t.tagStatus = 0'''
-        cursor.execute(query, (username,))
-        pending = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return pending
+        response = supabase.table("tagged") \
+            .select("*, photos(*)") \
+            .eq("username", user_id) \
+            .eq("tagStatus", False) \
+            .execute()
+        
+        return response.data
     
     @staticmethod
-    def create_tag(tagger, tagged, photo_id):
+    def create_tag(tagger_id, tagged_username, photo_id):
         """Create a tag or tag request"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        # Get tagged user's profile
+        user_response = supabase.table("profiles") \
+            .select("id, username") \
+            .eq("username", tagged_username) \
+            .single() \
+            .execute()
         
-        # Check if already tagged
-        query = 'SELECT * FROM tagged WHERE username = %s AND ID = %s'
-        cursor.execute(query, (tagged, photo_id))
-        existing = cursor.fetchone()
+        if not user_response.data:
+            return {"success": False, "message": "User not found"}
         
-        if existing:
-            if existing['tagStatus'] == 1:
-                result = {"success": False, "message": "User is already tagged"}
+        tagged_user_id = user_response.data['id']
+        
+        # Check if tag already exists
+        existing_tag = supabase.table("tagged") \
+            .select("*") \
+            .eq("username", tagged_user_id) \
+            .eq("ID", photo_id) \
+            .execute()
+        
+        if existing_tag.data:
+            if any(tag['tagStatus'] for tag in existing_tag.data):
+                return {"success": False, "message": "User is already tagged"}
             else:
-                result = {"success": False, "message": "Tag request already pending"}
-            cursor.close()
-            conn.close()
-            return result
+                return {"success": False, "message": "Tag request already pending"}
         
         # Self-tagging is automatically accepted
-        if tagger == tagged:
-            query = 'INSERT INTO tagged(username, ID, tagStatus) VALUES (%s, %s, 1)'
-            cursor.execute(query, (tagged, photo_id))
-            result = {"success": True, "message": "Self-tagged successfully"}
-            cursor.close()
-            conn.close()
-            return result
+        if tagged_user_id == tagger_id:
+            supabase.table("tagged").insert({
+                "username": tagged_user_id,
+                "ID": photo_id,
+                "tagStatus": True
+            }).execute()
+            return {"success": True, "message": "Self-tagged successfully"}
         
-        # Check if photo is visible to tagged user
-        query = '''SELECT followerUsername AS username FROM follow 
-                  WHERE followerUsername = %s AND followingUsername = %s AND followStatus = 1
-                  UNION SELECT username FROM belongto AS b 
-                  JOIN sharewith AS s ON (b.groupName = s.groupName)
-                  JOIN photo AS p ON (s.ID = p.ID) 
-                  WHERE username = %s AND p.ID = %s'''
-        cursor.execute(query, (tagged, tagger, tagged, photo_id))
-        visible = cursor.fetchone()
+        # Check if the photo is visible to the tagged user
+        visibility_check = supabase.rpc('check_photo_visibility', {
+            'p_user_id': tagged_user_id,
+            'p_photo_id': photo_id
+        }).execute()
         
-        if not visible:
-            result = {"success": False, "message": "This user cannot see your image"}
-            cursor.close()
-            conn.close()
-            return result
+        if not visibility_check.data or not visibility_check.data[0]:
+            return {"success": False, "message": "This user cannot see your image"}
         
         # Create pending tag
-        query = 'INSERT INTO tagged(username, ID, tagStatus) VALUES (%s, %s, 0)'
-        cursor.execute(query, (tagged, photo_id))
-        result = {"success": True, "message": "Tag request sent"}
-        cursor.close()
-        conn.close()
-        return result
+        supabase.table("tagged").insert({
+            "username": tagged_user_id,
+            "ID": photo_id,
+            "tagStatus": False
+        }).execute()
+        
+        return {"success": True, "message": "Tag request sent"}
     
     @staticmethod
-    def manage_tag(username, photo_id, accept):
+    def manage_tag(user_id, photo_id, accept):
         """Accept or reject a tag request"""
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         if accept:
-            query = 'UPDATE tagged SET tagStatus = 1 WHERE username = %s AND ID = %s'
-            cursor.execute(query, (username, photo_id))
-            result = {"success": True, "message": "Tag accepted"}
+            # Accept the tag
+            supabase.table("tagged") \
+                .update({"tagStatus": True}) \
+                .eq("username", user_id) \
+                .eq("ID", photo_id) \
+                .execute()
+            return {"success": True, "message": "Tag accepted"}
         else:
-            query = 'DELETE FROM tagged WHERE username = %s AND ID = %s'
-            cursor.execute(query, (username, photo_id))
-            result = {"success": True, "message": "Tag rejected"}
-        
-        cursor.close()
-        conn.close()
-        return result
+            # Decline the tag
+            supabase.table("tagged") \
+                .delete() \
+                .eq("username", user_id) \
+                .eq("ID", photo_id) \
+                .execute()
+            return {"success": True, "message": "Tag rejected"}
