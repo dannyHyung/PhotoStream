@@ -1,7 +1,6 @@
-import hashlib
 from flask import Blueprint, render_template, request, session, url_for, redirect, flash
-from app.utils.db import get_db_connection
-from flask import current_app
+from app.models.user import User
+from app.utils.supabase import supabase
 
 bp = Blueprint('auth', __name__)
 
@@ -16,21 +15,17 @@ def register():
 @bp.route('/loginAuth', methods=['GET', 'POST'])
 def login_auth():
     if request.form:
-        request_data = request.form
-        username = request_data["username"]
-        password = request_data["password"] + current_app.config['SALT']
-        hashed_password = hashlib.sha256(password.encode("utf-8")).hexdigest()
+        username = request.form["username"]
+        password = request.form["password"]
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        query = 'SELECT * FROM person WHERE username = %s and password = %s'
-        cursor.execute(query, (username, hashed_password))
-        data = cursor.fetchone()
-        cursor.close()
-        conn.close()
+        # Authenticate with Supabase
+        result = User.authenticate(username, password)
         
-        if data:
-            session['username'] = username
+        if result["success"]:
+            # Store user info in session
+            session['username'] = result["username"]
+            session['user_id'] = result["user_id"]
+            
             return redirect(url_for('main.home'))
         else:
             error = 'Incorrect username or password'
@@ -39,33 +34,26 @@ def login_auth():
 @bp.route('/registerAuth', methods=['GET', 'POST'])
 def register_auth():
     username = request.form['username']
-    password = request.form['password'] + current_app.config['SALT']
-    hashed_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
+    password = request.form['password']
     firstname = request.form['firstName']
     lastname = request.form['lastName']
     biography = request.form['biography']
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    # Create user with Supabase
+    result = User.create(username, password, firstname, lastname, biography)
     
-    # Check if user already exists
-    query = 'SELECT * FROM person WHERE username = %s'
-    cursor.execute(query, (username))
-    data = cursor.fetchone()
-    
-    if data:
-        error = 'This user already exists'
-        cursor.close()
-        conn.close()
-        return render_template('register.html', error=error)
-    else:
-        ins = 'INSERT INTO person VALUES(%s, %s, %s, %s, %s)'
-        cursor.execute(ins, (username, hashed_password, firstname, lastname, biography))
-        cursor.close()
-        conn.close()
+    if result["success"]:
         return render_template('index.html')
+    else:
+        return render_template('register.html', error=result["message"])
 
 @bp.route('/logout')
 def logout():
-    session.pop('username')
+    # Sign out from Supabase
+    supabase.auth.sign_out()
+    
+    # Clear session
+    session.pop('username', None)
+    session.pop('user_id', None)
+    
     return redirect(url_for('main.index'))

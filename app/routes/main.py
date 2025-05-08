@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, session
+from flask import Blueprint, render_template, session, request
 from app.utils.decorators import login_required
-from app.utils.db import get_db_connection
 from app.models.photo import Photo
 from app.models.follow import Follow
 from app.models.tags import Tag
+from app.models.user import User
+from app.utils.supabase import supabase
 
 
 bp = Blueprint('main', __name__)
@@ -15,47 +16,39 @@ def index():
 @bp.route('/home')
 @login_required
 def home():
-    user = session['username']
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    user_id = session['user_id']
+    username = session['username']
     
     # Get user's photos
-    query = '''SELECT ID, firstName, lastName, photoOwner, postingDate, caption, filePath
-               FROM photo JOIN person ON (photoOwner = username)
-               WHERE photoOwner = %s
-               ORDER BY postingDate DESC'''
-    cursor.execute(query, (user))
-    posts = cursor.fetchall()
+    posts = Photo.get_user_photos(user_id)
     
-    # Get tagged users
-    query2 = 'SELECT * FROM tagged NATURAL JOIN person WHERE tagStatus = 1'
-    cursor.execute(query2)
-    tagposts = cursor.fetchall()
+    # Get tag information
+    tag_response = supabase.table("tagged") \
+        .select("*, profiles(username)") \
+        .eq("tagStatus", True) \
+        .execute()
     
-    # Get likes
-    query3 = 'SELECT * FROM liked'
-    cursor.execute(query3)
-    likepost = cursor.fetchall()
-    
-    cursor.close()
-    conn.close()
+    # Get like information
+    like_response = supabase.table("liked") \
+        .select("*") \
+        .execute()
     
     return render_template('home.html', 
-                          username=user, 
+                          username=username, 
                           posts=posts, 
-                          tagposts=tagposts, 
-                          likepost=likepost)
+                          tagposts=tag_response.data, 
+                          likepost=like_response.data)
 
 @bp.route("/manage")
 @login_required
 def manage():
-    username = session['username']
+    user_id = session['user_id']
     
     # Get pending follow requests
-    follow_requests = Follow.get_pending_followers(username)
+    follow_requests = Follow.get_pending_followers(user_id)
     
     # Get pending tag requests
-    tag_requests = Tag.get_pending_tags(username)
+    tag_requests = Tag.get_pending_tags(user_id)
     
     return render_template("manage.html", 
                           dataFollow=follow_requests, 
@@ -64,25 +57,35 @@ def manage():
 @bp.route('/view')
 @login_required
 def view():
-    user = session['username']
+    user_id = session['user_id']
+    username = session['username']
     
     # Get feed photos
-    posts = Photo.get_feed_photos(user)
+    posts = Photo.get_feed_photos(user_id)
     
-    # Get tags and likes
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    query2 = 'SELECT * FROM tagged NATURAL JOIN person WHERE tagStatus = 1'
-    cursor.execute(query2)
-    tagposts = cursor.fetchall()
-    query3 = 'SELECT * FROM liked'
-    cursor.execute(query3)
-    likepost = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    # Get tag information
+    tag_response = supabase.table("tagged") \
+        .select("*, profiles(username)") \
+        .eq("tagStatus", True) \
+        .execute()
+    
+    # Get like information
+    like_response = supabase.table("liked") \
+        .select("*") \
+        .execute()
     
     return render_template('view.html', 
-                          username=user, 
+                          username=username, 
                           posts=posts, 
-                          tagposts=tagposts, 
-                          likepost=likepost)
+                          tagposts=tag_response.data, 
+                          likepost=like_response.data)
+
+@bp.route('/select_blogger')
+@login_required
+def select_blogger():
+    user_id = session['user_id']
+    
+    # Get all users except current user
+    users = User.get_all_users(except_user_id=user_id)
+    
+    return render_template('select_blogger.html', user_list=users)
