@@ -41,8 +41,8 @@ class User:
                 "success": True,
                 "user_id": user_id,
                 "username": profile.get('username'),
-                "firstName": profile.get('firstName'),
-                "lastName": profile.get('lastName')
+                "firstname": profile.get('firstname'),
+                "lastname": profile.get('lastname')
             }
         except Exception as e:
             return {
@@ -63,15 +63,19 @@ class User:
             if existing.data:
                 return {"success": False, "message": "This user already exists"}
             
+            # If username contains @, use it directly as email
+            # Otherwise, append @example.com
+            email = username if '@' in username else f"{username}@example.com"
+            
             # Create a new user
             auth_response = supabase.auth.sign_up({
-                "email": f"{username}@example.com",  # Convert username to email format
+                "email": email,
                 "password": password,
                 "options": {
                     "data": {
                         "username": username,
-                        "first_name": firstname,
-                        "last_name": lastname
+                        "firstname": firstname,
+                        "lastname": lastname
                     }
                 }
             })
@@ -80,8 +84,8 @@ class User:
             profile_data = {
                 "id": auth_response.user.id,
                 "username": username,
-                "firstName": firstname, 
-                "lastName": lastname,
+                "firstname": firstname, 
+                "lastname": lastname,
                 "biography": biography
             }
             
