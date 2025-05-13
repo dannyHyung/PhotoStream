@@ -35,15 +35,15 @@ Shared & Following
 	<!-- <th>Liked</th>
 	<th>Comment</th> -->
 <!-- {%for line2 in posts2%}
-		<td>{{line2.firstName}} {{line2.lastName}}</td>
+		<td>{{line2.firstname}} {{line2.lastname}}</td>
 		{%endfor%} -->
 {% for line in posts %}
 	<tr>
-		<td><img src="/static/{{line.filePath}}" height = "200" width="300"/></td>
+		<td><img src="/static/{{line.filepath}}" height = "200" width="300"/></td>
 		<th>{{line.ID}}</th>
-		<td>{{line.firstName}} {{line.lastName}}</td>
-		<td>{{line.photoOwner}}</td>
-		<td>{{line.postingDate}}</td>
+		<td>{{line.firstname}} {{line.lastname}}</td>
+		<td>{{line.photoowner}}</td>
+		<td>{{line.postingdate}}</td>
 		<td>{{line.caption}}</td>
 		<td>{% for tag in tagposts %}
 			{%if line.ID ==tag.ID %}

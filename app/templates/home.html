@@ -36,11 +36,11 @@ Personal Wall
 
 {% for line in posts %}
 	<tr>
-		<td><img src="/static/{{line.filePath}}" height = "200" width="300"/></td>
+		<td><img src="/static/{{line.filepath}}" height = "200" width="300"/></td>
 		<td>{{line.ID}}</td>
-		<td>{{line.firstName}} {{line.lastName}}</td>
-		<td>{{line.photoOwner}}</td>
-		<td>{{line.postingDate}}</td>
+		<td>{{line.firstname}} {{line.lastname}}</td>
+		<td>{{line.photoowner}}</td>
+		<td>{{line.postingdate}}</td>
 		<td>{{line.caption}}</td>
 		<td>{% for tag in tagposts %}
 			{%if line.ID ==tag.ID %}

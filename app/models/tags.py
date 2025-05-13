@@ -7,7 +7,7 @@ class Tag:
         response = supabase.table("tagged") \
             .select("*, profiles(username)") \
             .eq("ID", photo_id) \
-            .eq("tagStatus", True) \
+            .eq("tagstatus", True) \
             .execute()
         
         return response.data
@@ -18,7 +18,7 @@ class Tag:
         response = supabase.table("tagged") \
             .select("*, photos(*)") \
             .eq("username", user_id) \
-            .eq("tagStatus", False) \
+            .eq("tagstatus", False) \
             .execute()
         
         return response.data
@@ -46,7 +46,7 @@ class Tag:
             .execute()
         
         if existing_tag.data:
-            if any(tag['tagStatus'] for tag in existing_tag.data):
+            if any(tag['tagstatus'] for tag in existing_tag.data):
                 return {"success": False, "message": "User is already tagged"}
             else:
                 return {"success": False, "message": "Tag request already pending"}
@@ -56,7 +56,7 @@ class Tag:
             supabase.table("tagged").insert({
                 "username": tagged_user_id,
                 "ID": photo_id,
-                "tagStatus": True
+                "tagstatus": True
             }).execute()
             return {"success": True, "message": "Self-tagged successfully"}
         
@@ -73,7 +73,7 @@ class Tag:
         supabase.table("tagged").insert({
             "username": tagged_user_id,
             "ID": photo_id,
-            "tagStatus": False
+            "tagstatus": False
         }).execute()
         
         return {"success": True, "message": "Tag request sent"}
@@ -84,7 +84,7 @@ class Tag:
         if accept:
             # Accept the tag
             supabase.table("tagged") \
-                .update({"tagStatus": True}) \
+                .update({"tagstatus": True}) \
                 .eq("username", user_id) \
                 .eq("ID", photo_id) \
                 .execute()

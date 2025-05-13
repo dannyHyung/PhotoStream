@@ -5,7 +5,7 @@ class Group:
     def get_user_groups(user_id):
         """Get groups the user belongs to"""
         response = supabase.table("belongto") \
-            .select("groupName, groupOwner") \
+            .select("groupname, groupowner") \
             .eq("username", user_id) \
             .execute()
         
@@ -17,8 +17,8 @@ class Group:
         # Check if group already exists
         existing = supabase.table("friendgroups") \
             .select("*") \
-            .eq("groupName", group_name) \
-            .eq("groupOwner", owner_id) \
+            .eq("groupname", group_name) \
+            .eq("groupowner", owner_id) \
             .execute()
             
         if existing.data:
@@ -26,15 +26,15 @@ class Group:
         
         # Create the group
         supabase.table("friendgroups").insert({
-            "groupName": group_name,
-            "groupOwner": owner_id
+            "groupname": group_name,
+            "groupowner": owner_id
         }).execute()
         
         # Add owner to the group
         supabase.table("belongto").insert({
             "username": owner_id,
-            "groupName": group_name,
-            "groupOwner": owner_id
+            "groupname": group_name,
+            "groupowner": owner_id
         }).execute()
         
         return {"success": True, "message": "Group created successfully"}
@@ -46,8 +46,8 @@ class Group:
         existing = supabase.table("belongto") \
             .select("*") \
             .eq("username", user_id) \
-            .eq("groupName", group_name) \
-            .eq("groupOwner", group_owner) \
+            .eq("groupname", group_name) \
+            .eq("groupowner", group_owner) \
             .execute()
             
         if existing.data:
@@ -56,8 +56,8 @@ class Group:
         # Add user to group
         supabase.table("belongto").insert({
             "username": user_id,
-            "groupName": group_name,
-            "groupOwner": group_owner
+            "groupname": group_name,
+            "groupowner": group_owner
         }).execute()
         
         return {"success": True, "message": "User added to group"}

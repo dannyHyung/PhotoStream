@@ -5,18 +5,18 @@ class Photo:
     def get_user_photos(user_id):
         """Get photos posted by a user"""
         response = supabase.table("photos") \
-            .select("*, profiles(firstName, lastName)") \
-            .eq("photoOwner", user_id) \
-            .order("postingDate", desc=True) \
+            .select("*, profiles!photos_photoowner_fkey(firstname, lastname)") \
+            .eq("photoowner", user_id) \
+            .order("postingdate", desc=True) \
             .execute()
-        
+    
         return response.data
     
     @staticmethod
     def get_photo_by_id(photo_id):
         """Get a specific photo by ID"""
         response = supabase.table("photos") \
-            .select("*, profiles(firstName, lastName)") \
+            .select("*, profiles(firstname, lastname)") \
             .eq("id", photo_id) \
             .single() \
             .execute()
@@ -46,9 +46,9 @@ class Photo:
         
         # Add image record to database
         photo_data = {
-            "photoOwner": user_id,
-            "filePath": file_path,
-            "allFollowers": all_followers == '1',
+            "photoowner": user_id,
+            "filepath": file_path,
+            "allfollowers": all_followers == '1',
             "caption": caption
         }
         
@@ -60,17 +60,17 @@ class Photo:
             
             # Get group owner
             group_response = supabase.table("friendgroups") \
-                .select("groupOwner") \
-                .eq("groupName", group_name) \
+                .select("groupowner") \
+                .eq("groupname", group_name) \
                 .execute()
                 
             if group_response.data:
-                groupOwner = group_response.data[0]['groupOwner']
+                groupowner = group_response.data[0]['groupowner']
                 
                 # Check if user belongs to the group
                 belong_response = supabase.table("belongto") \
                     .select("*") \
-                    .eq("groupName", group_name) \
+                    .eq("groupname", group_name) \
                     .eq("username", user_id) \
                     .execute()
                     
@@ -78,8 +78,8 @@ class Photo:
                     # Share with group
                     share_data = {
                         "ID": photo_id,
-                        "groupName": group_name,
-                        "groupOwner": groupOwner
+                        "groupname": group_name,
+                        "groupowner": groupowner
                     }
                     
                     supabase.table("sharewith").insert(share_data).execute()

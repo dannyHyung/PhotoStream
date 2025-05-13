@@ -35,8 +35,8 @@ def login_auth():
 def register_auth():
     username = request.form['username']
     password = request.form['password']
-    firstname = request.form['firstName']
-    lastname = request.form['lastName']
+    firstname = request.form['firstname']
+    lastname = request.form['lastname']
     biography = request.form['biography']
     
     # Create user with Supabase

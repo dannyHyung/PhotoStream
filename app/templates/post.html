@@ -17,14 +17,14 @@
         <div>
             <input type="file" name = "imageToUpload" accept = "image/*" required/> 
         	</br>
-            <input type="radio" name="allFollowers" value="1"required/> Visible to all followers
+            <input type="radio" name="allfollowers" value="1"required/> Visible to all followers
             <br/>
-            <input type="radio" name="allFollowers" value="0"required/> Visible to group members only
+            <input type="radio" name="allfollowers" value="0"required/> Visible to group members only
         
 			<form action="/action_page.php">
-                <select groupName = 'groupName' name = 'groupName'>
+                <select groupname = 'groupname' name = 'groupname'>
 					{% for line in group %}
-					<option value='{{line.groupName}}'>{{line.groupName}} </option>
+					<option value='{{line.groupname}}'>{{line.groupname}} </option>
 					{% endfor %}
                 </select>
 			</form>

@@ -98,7 +98,7 @@ class User:
     @staticmethod
     def get_all_users(except_user_id=None):
         """Get all users, optionally excluding one user"""
-        query = supabase.table("profiles").select("username, firstName, lastName")
+        query = supabase.table("profiles").select("username, firstname, lastname")
         
         if except_user_id:
             query = query.neq("id", except_user_id)

@@ -18,7 +18,7 @@ table, th{
 		<tr>
 		<td>
 		{% for line in dataFollow %}
-		<input type="radio" name="followerUsername" value={{line.followerUsername}} required/> {{line.followerUsername}}</input>
+		<input type="radio" name="followerusername" value={{line.followerusername}} required/> {{line.followerusername}}</input>
 		{%endfor%}
 		</td>
 		</tr>
@@ -49,8 +49,8 @@ table, th{
 	<tr>
 		<td>
 		<input type="radio" name="ID" value={{line.ID}} required/> {{line.ID}}</input></td>
-		<td><img src="/static/{{line.filePath}}" height = "100" width="150"/></td>
-		<td>{{line.photoOwner}}</td>
+		<td><img src="/static/{{line.filepath}}" height = "100" width="150"/></td>
+		<td>{{line.photoowner}}</td>
 	</tr>
 	{% endfor %}
 	<table>

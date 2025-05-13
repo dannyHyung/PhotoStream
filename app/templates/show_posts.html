@@ -19,7 +19,7 @@ Here are posts by {{username}}:
 
 
 <form action="/followingAuth" method="POST">
-        <button type="submit" name = "photoOwner" value = {{username}}>Follow</button>
+        <button type="submit" name = "photoowner" value = {{username}}>Follow</button>
 </form>
 
 <form action="/show_posts" method="POST">
@@ -40,11 +40,11 @@ Here are posts by {{username}}:
 
 {% for line in posts %}
 	<tr>
-		<td><img src="/static/{{line.filePath}}" height = "200" width="300"/></td>
+		<td><img src="/static/{{line.filepath}}" height = "200" width="300"/></td>
 		<td>{{line.ID}}</td>
-		<td>{{line.firstName}} {{line.lastName}}</td>
-		<td>{{line.photoOwner}}</td>
-		<td>{{line.postingDate}}</td>
+		<td>{{line.firstname}} {{line.lastname}}</td>
+		<td>{{line.photoowner}}</td>
+		<td>{{line.postingdate}}</td>
 		<td>{{line.caption}}</td>
 		<td>{% for tag in tags %}
 			{%if line.ID ==tag.ID %}

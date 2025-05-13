@@ -23,12 +23,12 @@ def post():
 def post_auth():
     if request.files:
         user_id = session['user_id']
-        all_followers = request.form['allFollowers']
+        all_followers = request.form['allfollowers']
         caption = request.form['caption']
         image_file = request.files.get('imageToUpload', '')
         
         # Group name only relevant if not shared with all followers
-        group_name = request.form.get('groupName') if all_followers == '0' else None
+        group_name = request.form.get('groupname') if all_followers == '0' else None
         
         # Upload photo using model
         result = Photo.upload_photo(user_id, image_file, all_followers, caption, group_name)
@@ -53,11 +53,11 @@ def image(image_name):
 @bp.route('/show_posts')
 @login_required
 def show_posts():
-    viewing_username = request.args['photoOwner']
+    viewing_username = request.args['photoowner']
     
     # Get user's profile by username
     user_response = supabase.table("profiles") \
-        .select("id, username, firstName, lastName") \
+        .select("id, username, firstname, lastname") \
         .eq("username", viewing_username) \
         .single() \
         .execute()
@@ -70,15 +70,15 @@ def show_posts():
     
     # Get user's photos
     photo_response = supabase.table("photos") \
-        .select("*, profiles(firstName, lastName)") \
-        .eq("photoOwner", user_profile['id']) \
-        .order("postingDate", desc=True) \
+        .select("*, profiles(firstname, lastname)") \
+        .eq("photoowner", user_profile['id']) \
+        .order("postingdate", desc=True) \
         .execute()
     
     # Get tag information
     tag_response = supabase.table("tagged") \
         .select("*, profiles(username)") \
-        .eq("tagStatus", True) \
+        .eq("tagstatus", True) \
         .execute()
     
     # Get like information

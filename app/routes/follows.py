@@ -25,21 +25,21 @@ def following():
 @login_required
 def following_auth():
     user_id = session['user_id']
-    following_username = request.form['photoOwner']
+    following_username = request.form['photoowner']
     
     # Request to follow user
     result = Follow.request_follow(user_id, following_username)
     flash(result["message"])
     
     # Redirect back to show_posts
-    return redirect(url_for('photos.show_posts', photoOwner=following_username))
+    return redirect(url_for('photos.show_posts', photoowner=following_username))
 
 @bp.route('/manageFollow', methods=['GET', 'POST'])
 @login_required
 def manage_follow():
     user_id = session['user_id']
     choice = request.form['choice']
-    follower_username = request.form['followerUsername']
+    follower_username = request.form['followerusername']
     
     # Accept or decline follow request
     accept = (choice == '1')

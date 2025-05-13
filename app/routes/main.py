@@ -20,12 +20,16 @@ def home():
     username = session['username']
     
     # Get user's photos
-    posts = Photo.get_user_photos(user_id)
+    posts = supabase.table("photos") \
+        .select("*, profiles!photos_photoowner_fkey(firstname, lastname)") \
+        .eq("photoowner", user_id) \
+        .order("postingdate", desc=True) \
+        .execute()
     
     # Get tag information
     tag_response = supabase.table("tagged") \
         .select("*, profiles(username)") \
-        .eq("tagStatus", True) \
+        .eq("tagstatus", True) \
         .execute()
     
     # Get like information
@@ -66,7 +70,7 @@ def view():
     # Get tag information
     tag_response = supabase.table("tagged") \
         .select("*, profiles(username)") \
-        .eq("tagStatus", True) \
+        .eq("tagstatus", True) \
         .execute()
     
     # Get like information
